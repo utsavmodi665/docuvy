@@ -9,20 +9,28 @@ from PIL import Image
 from PyPDF2 import PdfReader
 from reportlab.pdfgen import canvas
 import fitz  # PyMuPDF
-from pptx import Presentation
-from pptx.util import Inches
+
+# Optional import (safe for cloud)
+try:
+    from pptx import Presentation
+    from pptx.util import Inches
+    PPTX_AVAILABLE = True
+except:
+    PPTX_AVAILABLE = False
+
 
 # =====================================================
-# 🔧 LIBREOFFICE DETECTION (CROSS-PLATFORM SAFE)
+# 🔧 LIBREOFFICE DETECTION (SAFE)
 # =====================================================
 def get_soffice_path():
-    # Try system PATH
-    path = shutil.which("soffice")
+    soffice = shutil.which("soffice")
 
-    if path:
-        return path
+    if soffice:
+        return soffice
 
-    # Windows fallback
+    if os.path.exists("/usr/bin/soffice"):  # Streamlit Cloud
+        return "/usr/bin/soffice"
+
     win_paths = [
         r"C:\Program Files\LibreOffice\program\soffice.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
@@ -31,32 +39,21 @@ def get_soffice_path():
         if os.path.exists(p):
             return p
 
-    # Streamlit Cloud fallback (Linux)
-    linux_path = "/usr/bin/soffice"
-    if os.path.exists(linux_path):
-        return linux_path
-
     return None
-
-
-def check_libreoffice():
-    soffice = get_soffice_path()
-    if not soffice:
-        raise Exception("LibreOffice not found. Install it or ensure packages.txt has 'libreoffice'.")
-    return soffice
 
 
 # =====================================================
 # 📄 DOCX → PDF
 # =====================================================
 def docx_to_pdf(input_path, output_path):
-    soffice = check_libreoffice()
+    soffice = get_soffice_path()
+
+    if not soffice:
+        raise Exception("❌ DOCX → PDF requires LibreOffice (not available)")
 
     subprocess.run([
         soffice,
         "--headless",
-        "--nologo",
-        "--nofirststartwizard",
         "--convert-to", "pdf",
         input_path,
         "--outdir", os.path.dirname(output_path)
@@ -65,7 +62,7 @@ def docx_to_pdf(input_path, output_path):
     generated = Path(input_path).with_suffix(".pdf")
 
     if not generated.exists():
-        raise Exception("DOCX → PDF conversion failed")
+        raise Exception("DOCX → PDF failed")
 
     os.replace(generated, output_path)
     return output_path
@@ -75,7 +72,10 @@ def docx_to_pdf(input_path, output_path):
 # 📊 PPTX → PDF
 # =====================================================
 def pptx_to_pdf(input_path, output_path):
-    soffice = check_libreoffice()
+    soffice = get_soffice_path()
+
+    if not soffice:
+        raise Exception("❌ PPTX → PDF requires LibreOffice (not available)")
 
     subprocess.run([
         soffice,
@@ -88,7 +88,7 @@ def pptx_to_pdf(input_path, output_path):
     generated = Path(input_path).with_suffix(".pdf")
 
     if not generated.exists():
-        raise Exception("PPTX → PDF conversion failed")
+        raise Exception("PPTX → PDF failed")
 
     os.replace(generated, output_path)
     return output_path
@@ -108,6 +108,9 @@ def pdf_to_docx(input_path, output_path):
 # 📊 PDF → PPTX
 # =====================================================
 def pdf_to_pptx(input_path, output_path):
+    if not PPTX_AVAILABLE:
+        raise Exception("❌ python-pptx not installed")
+
     pdf = fitz.open(input_path)
     prs = Presentation()
     blank_layout = prs.slide_layouts[6]
