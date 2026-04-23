@@ -122,7 +122,7 @@ with col1:
         st.image(logo_path, width=90)
     else:
         st.write("📄")  # fallback icon
-    st.image("logo.png")
+        st.image("logo.png")
 with col2:
     st.title("Docuvy")
     st.caption("Transform Files Instantly")
