@@ -111,8 +111,17 @@ with st.sidebar:
             st.success("💎 Pro User")
 
 # ---------------- HEADER ----------------
+# ---------------- HEADER ----------------
 col1, col2 = st.columns([1, 4])
+
+BASE_DIR = os.path.dirname(__file__)
+logo_path = os.path.join(BASE_DIR, "logo.png")
+
 with col1:
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=90)
+    else:
+        st.write("📄")  # fallback icon
     st.image("logo.png")
 with col2:
     st.title("Docuvy")
