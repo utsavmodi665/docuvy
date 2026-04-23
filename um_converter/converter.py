@@ -10,7 +10,7 @@ from PyPDF2 import PdfReader
 from reportlab.pdfgen import canvas
 import fitz  # PyMuPDF
 
-# Optional import (safe for cloud)
+# Optional imports (SAFE for cloud)
 try:
     from pptx import Presentation
     from pptx.util import Inches
@@ -20,7 +20,7 @@ except:
 
 
 # =====================================================
-# 🔧 LIBREOFFICE DETECTION (SAFE)
+# 🔧 LIBREOFFICE DETECTION
 # =====================================================
 def get_soffice_path():
     soffice = shutil.which("soffice")
@@ -31,6 +31,7 @@ def get_soffice_path():
     if os.path.exists("/usr/bin/soffice"):  # Streamlit Cloud
         return "/usr/bin/soffice"
 
+    # Windows fallback
     win_paths = [
         r"C:\Program Files\LibreOffice\program\soffice.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
@@ -49,23 +50,27 @@ def docx_to_pdf(input_path, output_path):
     soffice = get_soffice_path()
 
     if not soffice:
-        raise Exception("❌ DOCX → PDF requires LibreOffice (not available)")
+        raise Exception("❌ DOCX → PDF not supported (LibreOffice missing on server)")
 
-    subprocess.run([
-        soffice,
-        "--headless",
-        "--convert-to", "pdf",
-        input_path,
-        "--outdir", os.path.dirname(output_path)
-    ], check=True)
+    try:
+        subprocess.run([
+            soffice,
+            "--headless",
+            "--convert-to", "pdf",
+            input_path,
+            "--outdir", os.path.dirname(output_path)
+        ], check=True)
 
-    generated = Path(input_path).with_suffix(".pdf")
+        generated = Path(input_path).with_suffix(".pdf")
 
-    if not generated.exists():
-        raise Exception("DOCX → PDF failed")
+        if not generated.exists():
+            raise Exception("Conversion failed")
 
-    os.replace(generated, output_path)
-    return output_path
+        os.replace(generated, output_path)
+        return output_path
+
+    except Exception as e:
+        raise Exception(f"DOCX → PDF failed: {str(e)}")
 
 
 # =====================================================
@@ -75,23 +80,27 @@ def pptx_to_pdf(input_path, output_path):
     soffice = get_soffice_path()
 
     if not soffice:
-        raise Exception("❌ PPTX → PDF requires LibreOffice (not available)")
+        raise Exception("❌ PPTX → PDF not supported (LibreOffice missing)")
 
-    subprocess.run([
-        soffice,
-        "--headless",
-        "--convert-to", "pdf",
-        input_path,
-        "--outdir", os.path.dirname(output_path)
-    ], check=True)
+    try:
+        subprocess.run([
+            soffice,
+            "--headless",
+            "--convert-to", "pdf",
+            input_path,
+            "--outdir", os.path.dirname(output_path)
+        ], check=True)
 
-    generated = Path(input_path).with_suffix(".pdf")
+        generated = Path(input_path).with_suffix(".pdf")
 
-    if not generated.exists():
-        raise Exception("PPTX → PDF failed")
+        if not generated.exists():
+            raise Exception("Conversion failed")
 
-    os.replace(generated, output_path)
-    return output_path
+        os.replace(generated, output_path)
+        return output_path
+
+    except Exception as e:
+        raise Exception(f"PPTX → PDF failed: {str(e)}")
 
 
 # =====================================================
@@ -117,8 +126,12 @@ def pdf_to_pptx(input_path, output_path):
 
     for page in pdf:
         text = page.get_text("text")[:1200]
+
         slide = prs.slides.add_slide(blank_layout)
-        box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(6))
+        box = slide.shapes.add_textbox(
+            Inches(0.5), Inches(0.5),
+            Inches(9), Inches(6)
+        )
         box.text_frame.text = text
 
     prs.save(output_path)
@@ -161,6 +174,7 @@ def txt_to_pdf(input_path, output_path):
         for line in f:
             c.drawString(40, y, line.strip())
             y -= 20
+
             if y < 50:
                 c.showPage()
                 y = 800
@@ -198,7 +212,7 @@ def merge_pdfs(pdf_paths, output_path):
 
 
 # =====================================================
-# 🔄 CONVERT NON-PDF → PDF FOR MERGE
+# 🔄 CONVERT NON-PDF → PDF
 # =====================================================
 def to_pdf_if_needed(input_path, temp_dir):
     ext = Path(input_path).suffix.lower()
@@ -228,35 +242,23 @@ def to_pdf_if_needed(input_path, temp_dir):
 # =====================================================
 def convert_file(input_path, conv_type, output_path):
 
-    # 🔗 MERGE
     if conv_type == "merge_to_pdf":
         with tempfile.TemporaryDirectory() as temp_dir:
             pdfs = [to_pdf_if_needed(p, temp_dir) for p in input_path]
             return merge_pdfs(pdfs, output_path)
 
-    if conv_type == "docx_to_pdf":
-        return docx_to_pdf(input_path, output_path)
+    mapping = {
+        "docx_to_pdf": docx_to_pdf,
+        "pptx_to_pdf": pptx_to_pdf,
+        "txt_to_pdf": txt_to_pdf,
+        "image_to_pdf": image_to_pdf,
+        "pdf_to_docx": pdf_to_docx,
+        "pdf_to_txt": pdf_to_txt,
+        "pdf_to_pptx": pdf_to_pptx,
+        "pdf_to_image": pdf_to_image,
+    }
 
-    elif conv_type == "pptx_to_pdf":
-        return pptx_to_pdf(input_path, output_path)
-
-    elif conv_type == "txt_to_pdf":
-        return txt_to_pdf(input_path, output_path)
-
-    elif conv_type == "image_to_pdf":
-        return image_to_pdf(input_path, output_path)
-
-    elif conv_type == "pdf_to_docx":
-        return pdf_to_docx(input_path, output_path)
-
-    elif conv_type == "pdf_to_txt":
-        return pdf_to_txt(input_path, output_path)
-
-    elif conv_type == "pdf_to_pptx":
-        return pdf_to_pptx(input_path, output_path)
-
-    elif conv_type == "pdf_to_image":
-        return pdf_to_image(input_path, output_path)
-
-    else:
+    if conv_type not in mapping:
         raise ValueError(f"Unsupported conversion: {conv_type}")
+
+    return mapping[conv_type](input_path, output_path)
